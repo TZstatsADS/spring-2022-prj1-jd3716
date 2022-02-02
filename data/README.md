@@ -2,6 +2,6 @@
 
 ### Data folder
 
-The data directory contains data used in the analysis. This is treated as read only; in paricular the R/python files are never allowed to write to the files in here. Depending on the project, these might be csv files, a database, and the directory itself may have subdirectories.
+The data can be found on kaggle. The csv file have 11 variables and 360808 observations. Please make sure that the version is the same as what I used in this project. For peer reviewer, you can email jd3716@columbia.edu if you could not find the version that I used.
 
 

@@ -2,4 +2,4 @@
 
 ### Doc folder
 
-The doc directory contains the report or presentation files. It can have subfolders.  
+The doc directory contains two files: the knit html file of Rmarkdown and the pptx file for presentation.  

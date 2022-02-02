@@ -1,0 +1,138 @@
+---
+title: "project1"
+author: "jd3716"
+date: "1/31/2022"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+I also create a powerpoint file in folder "doc", please check that when doing peer review.
+
+1. R version and load the libraries needed in this project
+```{r warning=FALSE, message=FALSE}
+print(R.version)
+library(tm)
+library(wordcloud)
+library(plyr)
+library(jiebaR)
+```
+
+2. Read and clean the data
+```{r warning=FALSE}
+setwd("../data")
+data <- read.csv("philosophy_data.csv")
+names(data)
+```
+
+3. Find out the era that each school belongs to
+```{r}
+mean_min_max_opd <- function(df){
+  opd <- df$original_publication_date
+  return(c(mean(opd), min(opd), max(opd)))
+}
+schools_opd <- daply(data, .(school), mean_min_max_opd)
+colnames(schools_opd) <- c("mean", "min", "max")
+schools_opd
+```
+
+4. Extract all the texts from different schools, and save them in txt files.
+```{r warning=FALSE}
+exclude <- c("will", "can", "let", "ll", "re", "ve", "don", "something", "thing", "things", "isn", 
+             "one", "two", "also", "still", "even", "else", "now", "since", "however", "us", 
+             "just", "must", "upon", "thus", "yet", "might", "first", "nothing", "therefore", 
+             "may", "self", "merely", "rather", "within", "without", "never", "either", 
+             "every", "others", "whether", "another", "shall", "always", "many", "much", 
+             stopwords("english"))
+
+schoolnames <- unique(data$school)
+stcs_list <- c()
+words_list <- c()
+
+for (i in 1:length(schoolnames)){
+  sentences <- data[data$school == schoolnames[i], 10]
+  one_line_text <- paste(sentences, collapse = "\', \'")
+  words <- strsplit(one_line_text, "\', \'")[[1]]
+  # "words" is in the form of c("['a", "b", "c']", "['d", "e", ...)
+  one_line_text <- paste(words, collapse = " ")
+  sentences <- strsplit(one_line_text, "\'")[[1]]
+  # "sentences" is in the form of c("[", "sentence1", "][", "sentence2", "][", ...)
+  index <- seq(2, length(sentences), 2)
+  sentences <- sentences[index]
+  stcs_list <- c(stcs_list, list(sentences))
+  # now we get all lowered sentences without any punctuation
+  
+  one_line_text <- paste(sentences, collapse = " ")
+  words <- strsplit(one_line_text, " ")[[1]]
+  words <- words[-which(words %in% exclude)]
+  words_list <- c(words_list, list(words))
+}
+names(stcs_list) <- schoolnames
+names(words_list) <- schoolnames
+```
+
+5. Process text and inspect a WordCloud for each school
+```{r}
+for (i in 1:length(schoolnames)){
+  word_freq <- freq(words_list[[i]])
+  word_freq <- word_freq[order(word_freq$freq, decreasing = TRUE),]
+  wordcloud(word_freq[, 1], word_freq[, 2],
+          scale = c(3, 0.3), max.words = 45,
+          min.freq = 10, random.order = FALSE,
+          rot.per = 0.3, use.r.layout=T,
+          colors = brewer.pal(9, "Blues"))
+}
+```
+
+6. For those schools that have "vague" WordCloud, I first divide them in two groups, i.e., ancient and modern, and then generate two overall WordCloud.
+```{r warning=FALSE}
+ancient <- c(words_list[[1]], words_list[[2]], words_list[[11]])
+modern <- c(words_list[[4]], words_list[[5]], words_list[[6]], words_list[[7]], words_list[[12]])
+
+a_freq <- freq(ancient)
+m_freq <- freq(modern)
+wordcloud(a_freq[, 1], a_freq[, 2],
+          scale = c(3, 0.3), max.words = 45,
+          min.freq = 10, random.order = FALSE,
+          rot.per = 0.3, use.r.layout=T,
+          colors = brewer.pal(9, "Blues"))
+wordcloud(m_freq[, 1], m_freq[, 2],
+          scale = c(3, 0.3), max.words = 45,
+          min.freq = 10, random.order = FALSE,
+          rot.per = 0.3, use.r.layout=T,
+          colors = brewer.pal(9, "Blues"))
+
+a_freq <- a_freq[order(a_freq$freq, decreasing = TRUE),]
+m_freq <- m_freq[order(m_freq$freq, decreasing = TRUE),]
+m <- matrix(c(a_freq[1:10, 1], m_freq[1:10, 1]), ncol = 2)
+colnames(m) <- c("ancient", "modern")
+m
+```
+
+7. Cluster analysis on modern schools.
+```{r warning=FALSE}
+p <- "../output"
+setwd(p)
+dir.create("modern-school texts")
+index <- 1:13
+index <- index[-c(1, 2, 11)]
+for (i in index){
+  fname <- paste(c(schoolnames[i], ".txt"), collapse = "")
+  text <- paste(words_list[[i]], collapse = " ")
+  writeCorpus(text, path = "modern-school texts", filenames = fname)
+}
+
+folderpath <- paste(c(p, "/modern-school texts"), collapse = "")
+text_corpus <- Corpus(DirSource(folderpath))
+tm_map(text_corpus, stemDocument)
+dtm <- DocumentTermMatrix(text_corpus)
+df <- as.data.frame(inspect(dtm))
+df.scale <- scale(df)
+d <- dist(df.scale, method = "euclidean")
+fit <- hclust(d, method="ward.D")
+plot(fit,main ="cluster analysis")
+```
